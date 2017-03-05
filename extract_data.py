@@ -49,7 +49,6 @@ def get_data_from_file(filename):
 	target.append(pose.yS_m[init_record_i:])
 	target.append(pose.hS_m[init_record_i:])
 	target_t = np.array(target, dtype=np.float32).transpose()
-	target_t = np.subtract(target_t, target_t[0])
 
 	data = mat["summary"].scan.data[init_record_i:]
 

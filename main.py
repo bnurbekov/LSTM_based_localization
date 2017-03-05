@@ -111,12 +111,17 @@ def main(_):
 	print("Data shape:", data.shape)
 	print("Targets shape:", targets.shape)
 
+	prev = np.copy(targets[0])
+	for i in range(targets.shape[0]):
+		current = np.subtract(targets[i], prev)
+		prev = np.copy(targets[i])
+		targets[i] = current
+
+	print("New Data")
+
 	data, targets = extract_data.slice_data(data, targets, BATCH_SIZE, NUM_STEPS)
 
 	data = np.divide(data, data.max())
-
-	#for i in range(targets.shape[0]):
-
 
 	print("Cut data shape:", data.shape)
 	print("Cut targets shape:", targets.shape)
