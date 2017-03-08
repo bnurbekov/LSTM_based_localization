@@ -3,6 +3,7 @@ import numpy as np
 #import tf.train, tf.contrib.rnn
 import extract_data
 import time
+import math
 
 DATA_FILE = "/media/atlancer/My Passport/Projects/summary.mat"
 LOG_DIR = "/media/atlancer/My Passport/Projects/log_dir"
@@ -17,7 +18,7 @@ MAX_GRAD_NORM = 5
 INITIALIZER_STD_DEV = 0.1
 
 #Regularization:
-KEEP_PROB = 0.9 #(Set to large percentage since the network needs to encode the map precisely)
+KEEP_PROB = 0.35 #(Set to large percentage since the network needs to encode the map precisely)
 
 LEARNING_RATE = 1
 LEARNING_RATE_DECAY = 0.8
@@ -56,7 +57,8 @@ class Model:
 
 				outputs.append(out_coordinates)
 
-		self.loss = tf.reduce_mean(tf.reduce_mean(tf.reduce_sum(tf.square(tf.subtract(self.targets, outputs)), axis=2), axis=1))
+		self.difference = tf.subtract(self.targets, outputs)
+		self.loss = tf.reduce_mean(tf.reduce_mean(tf.reduce_sum(tf.square(self.difference), axis=2), axis=1))
 
 		self.final_state = state
 
@@ -83,6 +85,8 @@ def run(m, sess, data, targets, is_training, verbose=False):
 	fetches = {"final_state":m.final_state, "loss":m.loss}
 	if is_training:
 		fetches["train_op"] = m.train_op
+	else:
+		fetches["diff"] = m.difference
 
 	state = sess.run(m.initial_state)
 	epoch_size = data.shape[0]
@@ -102,6 +106,8 @@ def run(m, sess, data, targets, is_training, verbose=False):
 		if verbose:
 			print("Iteration: %d, Speed: %.3f, Loss: %.3f" % (iters, iters*BATCH_SIZE/(time.time()-start_time), vals["loss"]))
 
+		if not is_training and vals["loss"] > 0.005:
+			print("Something is wrong")
 
 	return total_loss/epoch_size
 
@@ -114,6 +120,7 @@ def main(_):
 	prev = np.copy(targets[0])
 	for i in range(targets.shape[0]):
 		current = np.subtract(targets[i], prev)
+		current[2] = math.atan2(math.sin(current[2]), math.cos(current[2]))
 		prev = np.copy(targets[i])
 		targets[i] = current
 
