@@ -162,7 +162,7 @@ def MakeHandlerClassFromArgv(model, session):
 
 				epoch_data = self.model.run(session, model_data, np.array([[[0, 0, 0]]]), False, verbose=True, record_outputs=True)
 				# just send back the same data, but upper-cased
-				self.request.sendall(bytes(json.dumps(epoch_data[0][0][0].tolist()), "utf-8"))
+				self.request.sendall(bytes(json.dumps(epoch_data[0][0][0].tolist())+"\r\n", "utf-8"))
 
 	return MyTCPHandler
 
