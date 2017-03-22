@@ -26,7 +26,7 @@ LEARNING_RATE = 1
 LEARNING_RATE_DECAY = 0.8
 LEARNING_RATE_DECAY_START_EPOCH_I = 6
 
-ONLINE_MODE = True
+ONLINE_MODE = False
 #if ONLINE_MODE is True, then set the following:
 HOST = '192.168.1.65'
 PORT = 7779
@@ -109,8 +109,8 @@ class Model:
 
 			feed_dict = {self.initial_state: state, self.epoch_data: data[epoch_i]}
 
-			if targets is not None and not is_training:
-				feed_dict[self.targets] = targets
+			if targets is not None:
+				feed_dict[self.targets] = targets[epoch_i]
 
 			vals = sess.run(fetches, feed_dict)
 			state = vals["final_state"]
@@ -118,7 +118,7 @@ class Model:
 			iters += NUM_STEPS
 
 			if verbose:
-				if not is_training and targets is not None:
+				if targets is not None and not is_training:
 					av_perc =np.mean(np.mean(np.mean(np.fabs(np.divide(vals["diff"], targets[epoch_i])), axis=2), axis=1))
 				else:
 					av_perc = -1
@@ -153,14 +153,14 @@ def MakeHandlerClassFromArgv(model, session):
 				self.data = self.rfile.readline().strip()
 				if not self.data:
 					break
-				print("{} wrote:".format(self.client_address[0]))
-				print(self.data)
+				#print("{} wrote:".format(self.client_address[0]))
+				#print(self.data)
 
 				arrData = np.array(json.loads(self.data.decode("utf-8")))
 
 				model_data = np.expand_dims(np.expand_dims(np.expand_dims(arrData, axis=0), axis=0), axis=0)
 
-				epoch_data = self.model.run(session, model_data, np.array([[[0, 0, 0]]]), False, verbose=True, record_outputs=True)
+				epoch_data = self.model.run(session, model_data, np.array([[[[0, 0, 0]]]]), False, verbose=True, record_outputs=True)
 				# just send back the same data, but upper-cased
 				self.request.sendall(bytes(json.dumps(epoch_data[0][0][0].tolist())+"\r\n", "utf-8"))
 
@@ -227,7 +227,9 @@ def main(_):
 				print("Running server!")
 				server.serve_forever()
 
+			print("Saving Model...")
 			sv.saver.save(sess, LOG_DIR, global_step=sv.global_step)
+			print("Saved!")
 
 if __name__ == "__main__":
 	tf.app.run()
