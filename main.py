@@ -85,7 +85,7 @@ class Model:
 	def assign_learning_rate(self, sess, new_value):
 		sess.run(self.learning_rate_update, feed_dict={self.new_learning_rate:new_value})
 
-	def run(self, sess, data, targets, is_training, verbose=False, record_outputs=False):
+	def run(self, sess, data, targets, is_training, verbose=False, record_outputs=False, init_state=None):
 		start_time = time.time()
 		total_loss = 0.0
 		iters = 0
@@ -98,7 +98,10 @@ class Model:
 			if record_outputs:
 				fetches["outputs"] = self.outputs
 
-		state = sess.run(self.initial_state)
+		if init_state is None:
+			state = sess.run(self.initial_state)
+		else:
+			state = init_state
 		epoch_size = data.shape[0]
 		epoch_outputs = []
 
@@ -130,13 +133,14 @@ class Model:
 			if record_outputs:
 				epoch_outputs.append(vals["outputs"])
 
-		return epoch_outputs
+		return epoch_outputs, state
 
 def MakeHandlerClassFromArgv(model, session):
 	class MyTCPHandler(socketserver.StreamRequestHandler, object):
 		def __init__(self, *args, **kwargs):
 			self.model = model
 			self.session = session
+			self.prev_state = None
 			super(MyTCPHandler, self).__init__(*args, **kwargs)
 
 		"""
@@ -160,7 +164,7 @@ def MakeHandlerClassFromArgv(model, session):
 
 				model_data = np.expand_dims(np.expand_dims(np.expand_dims(arrData, axis=0), axis=0), axis=0)
 
-				epoch_data = self.model.run(session, model_data, np.array([[[[0, 0, 0]]]]), False, verbose=True, record_outputs=True)
+				epoch_data, self.prev_state = self.model.run(session, model_data, np.array([[[[0, 0, 0]]]]), False, verbose=True, record_outputs=True, init_state=self.prev_state)
 				# just send back the same data, but upper-cased
 				self.request.sendall(bytes(json.dumps(epoch_data[0][0][0].tolist())+"\r\n", "utf-8"))
 
@@ -236,7 +240,7 @@ def main(_):
 					sv.restore(sess, ckpt.model_checkpoint_path)
 				else:
 					raise Exception("No checkpoint found!")
-				valid_model.run(sess, valid_data, valid_targets, False, verbose=True)
+				_, state = valid_model.run(sess, valid_data, valid_targets, False, verbose=True)
 				socketserver.TCPServer.allow_reuse_address = True
 				server = socketserver.TCPServer((HOST, PORT), MakeHandlerClassFromArgv(online_model, sess))
 				print("Running server!")
