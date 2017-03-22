@@ -26,7 +26,7 @@ LEARNING_RATE = 1
 LEARNING_RATE_DECAY = 0.8
 LEARNING_RATE_DECAY_START_EPOCH_I = 6
 
-ONLINE_MODE = False
+ONLINE_MODE = True
 #if ONLINE_MODE is True, then set the following:
 HOST = '192.168.1.65'
 PORT = 7779
@@ -167,7 +167,7 @@ def MakeHandlerClassFromArgv(model, session):
 	return MyTCPHandler
 
 def main(_):
-	if not ONLINE_MODE:
+	if True:
 		data, targets = extract_data.get_data_from_file(DATA_FILE)
 
 		print("Data shape:", data.shape)
@@ -216,20 +216,31 @@ def main(_):
 				online_model = Model(1, 1, is_training=False)
 		print("Done initializing online model!")
 
-		sv = tf.train.Supervisor(logdir=LOG_DIR)
-		with sv.managed_session() as sess:
+		init_op = tf.global_variables_initializer()
+
+		sv = tf.train.Saver()
+		with tf.Session() as sess:
 			if not ONLINE_MODE:
+				sess.run(init_op)
+
 				train_model.run(sess, training_data, training_targets, True, verbose=True)
 				valid_model.run(sess, valid_data, valid_targets, False, verbose=True)
+
+				print("Saving Model...")
+				sv.save(sess, LOG_DIR, global_step=0)
+				print("Saved!")
 			else:
+				ckpt = tf.train.get_checkpoint_state(LOG_DIR[:LOG_DIR.rfind("/")])
+				if ckpt and ckpt.model_checkpoint_path:
+					print(ckpt.model_checkpoint_path)
+					sv.restore(sess, ckpt.model_checkpoint_path)
+				else:
+					raise Exception("No checkpoint found!")
+				valid_model.run(sess, valid_data, valid_targets, False, verbose=True)
 				socketserver.TCPServer.allow_reuse_address = True
 				server = socketserver.TCPServer((HOST, PORT), MakeHandlerClassFromArgv(online_model, sess))
 				print("Running server!")
 				server.serve_forever()
-
-			print("Saving Model...")
-			sv.saver.save(sess, LOG_DIR, global_step=sv.global_step)
-			print("Saved!")
 
 if __name__ == "__main__":
 	tf.app.run()
