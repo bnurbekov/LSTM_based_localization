@@ -6,6 +6,7 @@ import time
 import math
 import socketserver
 import json
+import csv
 
 DATA_FILE = "/media/atlancer/My Passport/Projects/summary.mat"
 LOG_DIR = "/media/atlancer/My Passport/Projects/log_dir"
@@ -26,7 +27,7 @@ LEARNING_RATE = 1
 LEARNING_RATE_DECAY = 0.8
 LEARNING_RATE_DECAY_START_EPOCH_I = 6
 
-ONLINE_MODE = True
+ONLINE_MODE = False
 #if ONLINE_MODE is True, then set the following:
 HOST = '192.168.1.65'
 PORT = 7779
@@ -90,6 +91,11 @@ class Model:
 		total_loss = 0.0
 		iters = 0
 
+		## CSV 
+		res_file = open("results.csv" if is_training else "valid.csv", "w")
+		writer = csv.writer(res_file, delimiter=",")
+		##
+
 		fetches = {"final_state":self.final_state, "loss":self.loss}
 		if is_training:
 			fetches["train_op"] = self.train_op
@@ -127,11 +133,15 @@ class Model:
 					av_perc = -1
 				print("Iteration: %d, Speed: %.3f, Loss: %.3f, Av Perc: %f" % (iters, iters*BATCH_SIZE/(time.time()-start_time), vals["loss"], av_perc))
 
+				writer.writerow([iters, vals["loss"]])
+
 			if not is_training and vals["loss"] > 0.005:
 				print("Something is wrong. Loss: ", vals["loss"])
 
 			if record_outputs:
 				epoch_outputs.append(vals["outputs"])
+
+		res_file.close()
 
 		return epoch_outputs, state
 
@@ -171,7 +181,7 @@ def MakeHandlerClassFromArgv(model, session):
 	return MyTCPHandler
 
 def main(_):
-	if True:
+	if not ONLINE_MODE:
 		data, targets = extract_data.get_data_from_file(DATA_FILE)
 
 		print("Data shape:", data.shape)
@@ -197,8 +207,8 @@ def main(_):
 		print("Transposed data shape:", data.shape)
 		print("Transposed targets shape:", targets.shape)
 
-		training_data, training_targets = data[data.shape[0]//100:, :, :, :], targets[targets.shape[0]//100:, :, :, :]
-		valid_data, valid_targets = data[:data.shape[0]//100, :, :, :], targets[:targets.shape[0]//100, :, :, :]
+		training_data, training_targets = data[data.shape[0]//90:, :, :, :], targets[targets.shape[0]//90:, :, :, :]
+		valid_data, valid_targets = data[:data.shape[0]//90, :, :, :], targets[:targets.shape[0]//90, :, :, :]
 
 	with tf.Graph().as_default():
 		# Build model
